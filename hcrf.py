@@ -1,3 +1,12 @@
+# File: hcrf.py
+# Author: Dirko Coetsee
+# Date: 13 Augustus 2013
+# A script to train and test an HCRF for sparse input vectors.
+#
+# TODO: - Add support for more than one feature on each time step.
+#       - Add feature weights.
+#       - Change inference to use more efficient matrix routines.
+
 from numpy import array, zeros
 from numpy import exp, log, inf
 from random import random, seed
@@ -172,7 +181,7 @@ class hcrf:
         Train the model by maximising posterior with LM-BFGS.
 
         The training data should have been set at this stage:
-            >> h = hcrf(H, maxw, maxf, debug=False)
+            >> h = hcrf(H, maxw, maxf)
             >> h.X = X
             >> h.Y = Y
             >> h.lamb = lamb
@@ -217,51 +226,71 @@ class hcrf:
         print cor, total, cor * 1.0 / total
 
     def label(self):
+        """
+        Predict the labels of current input data and print to standard out.
+        """
         for x in X:
             pred = self.load_example(x)
             py = max(zip(pred, range(len(pred))), key=lambda x: x[0])[1]
             print py
 
     def load_params(self, filename):
+        """
+        Take parameters from file and set to current parameters.
+        """
         f = open(filename, 'r')
         p = array([float(line.strip("\n")) for line in f])
         self.param[self.param_non_inf_indexes] = p
 
     def save_params(self, filename):
+        """
+        Take current parameters and write to file.
+        """
         f = open(filename, 'w')
-        #p=array([float(line.strip("\n")) for line in f])
-        #self.param[self.param_non_inf_indexes]=p
         for p in self.param[self.param_non_inf_indexes]:
             f.write(str(p) + "\n")
         f.close()
 
-    def __init__(self, S, W, F, debug=False):
-        self.debug = debug
+    def __init__(self, S, W, F):
+        """
+        Initialize new HCRF object with hidden units with cardinality S,
+        output units that can take on W values, and binary indicator features
+        from 1 to F.
+        """
         self.S = S
         self.W = W
         seed(2)
+        # Initialize the parameters uniformly random on [0, 0.1]
         self.param = array([random() * 0.1 for i in xrange(S * S + S * W * F)])
         for s in xrange(S):
             for ps in xrange(S):
+                # Make it impossible for hidden units to remain in state 0.
                 if ps == 0 and s == 0:
                     self.param[s * S + ps] = -inf
+                # Hidden units can also not stay in last state S-1.
                 if ps == S - 1 and s == S - 1:
                     self.param[s * S + ps] = -inf
+                # Hidden states can only go to higher state or stay in the
+                # same state.
                 if s < ps:
                     self.param[s * S + ps] = -inf
-                if self.debug:
-                    print s * S + ps, s, ps, self.param[s * S + ps]
         self.param_non_inf_indexes = [i for i in xrange(len(self.param)) if self.param[i] != -inf]
 
 
 def load_data(filename):
+    """
+    Load training or testing data from file.
+
+    Return input vectors X, labels Y, cardinality of y in Y, and cardinality
+    of x in X.
+    """
     f = open(filename, "r")
     X = []
     Y = []
     maxf = 0
     maxw = 0
     for line in f:
-        toks = [int(tok) for tok in line.strip(" \n").split(" ")[:5]]
+        toks = [int(tok) for tok in line.strip(" \n").split(" ")]
         y = toks[0]
         if int(y) > maxw:
             maxw = int(y)
@@ -275,23 +304,37 @@ def load_data(filename):
 
 
 if __name__ == "__main__":
+    usage = """
+    Train, test, or use an HCRF to label input data.
 
-    #infile, outfile, H, lamb, valfile
+    usage: hcrf.py mode datafile paramfile H [lamb]
+
+    mode:      Set the script mode to train, tst, or label.
+    datafile:  File containing input datapoints.
+               Format: lines consisting of
+               label 1 [feat1 feat2 ... ] 2
+               where label is a non-negative integer, 1 is the special start
+               of datapoint feature, 2 is the special end of datapoint feature,
+               and feat1, feat2 etc. are integers > 2 representing features
+               activated at the first, second etc. time steps.
+    paramfile: File to store/retrieve parameters.
+    H:         Cardinality of hidden units. Must be >= 3.
+    lamb:      l2 reguralization constant. Only applicable when mode is train.
+    """
     datafile = sys.argv[2]
     paramfile = sys.argv[3]
     H = int(sys.argv[4])
     if sys.argv[1] == "train":
         lamb = float(sys.argv[5])
         X, Y, maxf, maxw = load_data(datafile)
-        h = hcrf(H, maxw, maxf, debug=False)
+        h = hcrf(H, maxw, maxf)
         h.X = X
         h.Y = Y
         h.lamb = lamb
         final_params = h.train_lmbfgs()
-        #h.param = final_params
-        print final_params
         h.param[h.param_non_inf_indexes] = final_params[0]
         h.save_params(paramfile)
+
     if sys.argv[1] == "tst":
         X, Y, maxf, maxw = load_data(datafile)
         h = hcrf(H, maxw, maxf)
