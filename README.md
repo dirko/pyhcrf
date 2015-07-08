@@ -1,4 +1,4 @@
-hcrf_sparse_python
+pyHCRF
 ==================
 
 An hidden conditional random field (HCRF) implementation for text applications 

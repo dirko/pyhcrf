@@ -14,13 +14,91 @@ import sys
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 
 
-class hcrf:
+class Hcrf(object):
     """
-    Represent the HCRF model.
+    The HCRF model.
 
     Includes methods for training using LM-BFGS, scoring, and testing, and
     helper methods for loading and saving parameter values to and from file.
     """
+    def __init__(self, S, l2_regularization=0.0):
+        """
+        Initialize new HCRF object with hidden units with cardinality S.
+        """
+        self.lamb = l2_regularization
+
+        self.S = S
+
+        self.A = None
+        self.B = None
+        self.C = None
+        self.D = None
+
+    def fit(self, X, y):
+        """Fit the model according to the given training data.
+
+        Parameters
+        ----------
+        X : List of list of ints. Each list of ints represent a training example. Each int in that list
+            is the index of a one-hot encoded feature.
+
+        y : array-like, shape (n_samples,)
+            Target vector relative to X.
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        self.X = X
+        self.Y = y
+
+        F = max(max(max(eeex for eeex in eex) for eex in ex) for ex in X) + 1
+        W = max(y) + 1
+        self.W = W
+        S = self.S
+
+        # Initialize the parameters uniformly random on [0, 0.1]
+        seed(2)
+        self.param = array([random() * 0.1 for i in xrange(S * S + S * W * F)])
+        for s in xrange(S):
+            for ps in xrange(S):
+                # Make it impossible for hidden units to remain in state 0.
+                if ps == 0 and s == 0:
+                    self.param[s * S + ps] = -inf
+                # Hidden units can also not stay in last state S-1.
+                if ps == S - 1 and s == S - 1:
+                    self.param[s * S + ps] = -inf
+                # Hidden states can only go to higher state or stay in the
+                # same state.
+                if s < ps:
+                    self.param[s * S + ps] = -inf
+        self.param_non_inf_indexes = [i for i in xrange(len(self.param)) if self.param[i] != -inf]
+
+        # Train
+        final_params = self.train_lmbfgs()
+        self.param[self.param_non_inf_indexes] = final_params[0]
+
+    def predict(self, X):
+        """Predict the class for X.
+
+        The predicted class for each sample in X is returned.
+
+        Parameters
+        ----------
+        X : List of list of ints, one list of ints for each training example.
+
+        Returns
+        -------
+        y : iterable of shape = [n_samples]
+            The predicted classes.
+        """
+        y = []
+        for x in X:
+            pred = self.load_example(x)
+            py = max(zip(pred, range(len(pred))), key=lambda element: element[0])[1]
+            y.append(py)
+        return y
 
     def reset_tables(self):
         T = self.T
@@ -51,16 +129,16 @@ class hcrf:
         # a training example with features x and label y.
         self.load_example(x)
         self.fill_D()
-        C = self.C
         D = self.D
-        T = self.T
         W = self.W
         S = self.S
+        T = self.T
+        C = self.C
         der = self.der
         ll = log(sum(C[T - 1, :, y]))
         self.ll += ll
 
-        # Factors without output vairable interaction
+        # Factors without output variable interaction
         for t in xrange(T):
             E_ef_norm = sum(C[t, :, y])
             for w in xrange(W):
@@ -203,6 +281,8 @@ class hcrf:
         der = -der - (-npar * self.lamb)
         # Print the log-likelihood
         print self.ll
+        print ll
+        print der
         return ll, der
 
     def test(self):
@@ -250,31 +330,6 @@ class hcrf:
         for p in self.param[self.param_non_inf_indexes]:
             f.write(str(p) + "\n")
         f.close()
-
-    def __init__(self, S, W, F):
-        """
-        Initialize new HCRF object with hidden units with cardinality S,
-        output units that can take on W values, and binary indicator features
-        from 1 to F.
-        """
-        self.S = S
-        self.W = W
-        seed(2)
-        # Initialize the parameters uniformly random on [0, 0.1]
-        self.param = array([random() * 0.1 for i in xrange(S * S + S * W * F)])
-        for s in xrange(S):
-            for ps in xrange(S):
-                # Make it impossible for hidden units to remain in state 0.
-                if ps == 0 and s == 0:
-                    self.param[s * S + ps] = -inf
-                # Hidden units can also not stay in last state S-1.
-                if ps == S - 1 and s == S - 1:
-                    self.param[s * S + ps] = -inf
-                # Hidden states can only go to higher state or stay in the
-                # same state.
-                if s < ps:
-                    self.param[s * S + ps] = -inf
-        self.param_non_inf_indexes = [i for i in xrange(len(self.param)) if self.param[i] != -inf]
 
 
 def load_data(filename):
@@ -327,7 +382,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "train":
         lamb = float(sys.argv[5])
         X, Y, maxf, maxw = load_data(datafile)
-        h = hcrf(H, maxw, maxf)
+        h = Hcrf(H, maxw, maxf)
         h.X = X
         h.Y = Y
         h.lamb = lamb
@@ -337,7 +392,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "tst":
         X, Y, maxf, maxw = load_data(datafile)
-        h = hcrf(H, maxw, maxf)
+        h = Hcrf(H, maxw, maxf)
         h.load_params(paramfile)
         h.X = X
         h.Y = Y
@@ -345,7 +400,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "label":
         X, Y, maxf, maxw = load_data(datafile)
-        h = hcrf(H, maxw, maxf)
+        h = Hcrf(H, maxw, maxf)
         h.load_params(paramfile)
         h.X = X
         h.label()
