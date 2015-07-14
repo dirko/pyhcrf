@@ -7,8 +7,7 @@
 #       - Add feature weights.
 #       - Change inference to use more efficient matrix routines.
 
-from numpy import array, zeros
-from numpy import exp, log, inf
+import numpy
 from random import random, seed
 import sys
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
@@ -60,20 +59,20 @@ class Hcrf(object):
 
         # Initialize the parameters uniformly random on [0, 0.1]
         seed(2)
-        self.param = array([random() * 0.1 for i in xrange(S * S + S * W * F)])
+        self.param = numpy.array([random() * 0.1 for i in xrange(S * S + S * W * F)])
         for s in xrange(S):
             for ps in xrange(S):
                 # Make it impossible for hidden units to remain in state 0.
                 if ps == 0 and s == 0:
-                    self.param[s * S + ps] = -inf
+                    self.param[s * S + ps] = -numpy.inf
                 # Hidden units can also not stay in last state S-1.
                 if ps == S - 1 and s == S - 1:
-                    self.param[s * S + ps] = -inf
+                    self.param[s * S + ps] = -numpy.inf
                 # Hidden states can only go to higher state or stay in the
                 # same state.
                 if s < ps:
-                    self.param[s * S + ps] = -inf
-        self.param_non_inf_indexes = [i for i in xrange(len(self.param)) if self.param[i] != -inf]
+                    self.param[s * S + ps] = -numpy.inf
+        self.param_non_inf_indexes = [i for i in xrange(len(self.param)) if self.param[i] != -numpy.inf]
 
         # Train
         final_params = self.train_lmbfgs()
@@ -104,13 +103,13 @@ class Hcrf(object):
         T = self.T
         S = self.S
         W = self.W
-        self.A = zeros((T, S, W))
-        self.B = zeros((T, S, W))
-        self.C = zeros((T, S, W))
-        self.D = zeros((T, S, S, W))
+        self.A = numpy.zeros((T, S, W))
+        self.B = numpy.zeros((T, S, W))
+        self.C = numpy.zeros((T, S, W))
+        self.D = numpy.zeros((T, S, S, W))
 
     def reset_deriv(self):
-        self.der = zeros(len(self.param))
+        self.der = numpy.zeros(len(self.param))
         self.ll = 0.0
 
     def load_example(self, x):
@@ -135,7 +134,7 @@ class Hcrf(object):
         T = self.T
         C = self.C
         der = self.der
-        ll = log(sum(C[T - 1, :, y]))
+        ll = numpy.log(sum(C[T - 1, :, y]))
         self.ll += ll
 
         # Factors without output variable interaction
@@ -178,13 +177,13 @@ class Hcrf(object):
         W = self.W
         A = self.A
         for w in xrange(W):
-            A[0, 0, w] = exp(self.get_f_single(0, 0, w))
+            A[0, 0, w] = numpy.exp(self.get_f_single(0, 0, w))
 
         for t in xrange(1, T):
             for w in xrange(W):
                 for s in xrange(S):
                     for ps in xrange(S):
-                        A[t, s, w] = A[t, s, w] + A[t - 1, ps, w] * exp(self.get_f(t, s, ps, w))
+                        A[t, s, w] = A[t, s, w] + A[t - 1, ps, w] * numpy.exp(self.get_f(t, s, ps, w))
             norm = sum(sum(A[t, :, :]))
             A[t, :, :] /= norm
 
@@ -195,12 +194,12 @@ class Hcrf(object):
         W = self.W
         B = self.B
         for w in xrange(W):
-            B[T - 1, S - 1, w] = exp(self.get_f_single(T - 1, S - 1, w))
+            B[T - 1, S - 1, w] = numpy.exp(self.get_f_single(T - 1, S - 1, w))
         for t in xrange(T - 2, -1, -1):
             for w in xrange(W):
                 for s in xrange(S):
                     for ps in xrange(S):
-                        B[t, ps, w] = B[t, ps, w] + B[t + 1, s, w] * exp(self.get_f(t + 1, s, ps, w))
+                        B[t, ps, w] = B[t, ps, w] + B[t + 1, s, w] * numpy.exp(self.get_f(t + 1, s, ps, w))
             norm = sum(sum(B[t, :, :]))
             B[t, :, :] /= norm
 
@@ -223,7 +222,7 @@ class Hcrf(object):
             for w in xrange(W):
                 for s in xrange(S):
                     for ps in xrange(S):
-                        D[t, s, ps, w] = A[t, ps, w] * B[t + 1, s, w] * exp(self.get_f(t + 1, s, ps, w))
+                        D[t, s, ps, w] = A[t, ps, w] * B[t + 1, s, w] * numpy.exp(self.get_f(t + 1, s, ps, w))
             norm = sum(sum(sum(D[t, :, :, :])))
             D[t, :, :, :] /= norm
 
@@ -294,7 +293,7 @@ class Hcrf(object):
         """
         total = 0
         cor = 0
-        conf = zeros((self.W, self.W))
+        conf = numpy.zeros((self.W, self.W))
         for x, y in zip(self.X, self.Y):
             pred = self.load_example(x)
             py = max(zip(pred, range(len(pred))), key=lambda x: x[0])[1]
@@ -319,7 +318,7 @@ class Hcrf(object):
         Take parameters from file and set to current parameters.
         """
         f = open(filename, 'r')
-        p = array([float(line.strip("\n")) for line in f])
+        p = numpy.array([float(line.strip("\n")) for line in f])
         self.param[self.param_non_inf_indexes] = p
 
     def save_params(self, filename):
