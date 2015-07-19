@@ -158,7 +158,6 @@ class Hcrf(object):
 
 def forward_backward(x, state_parameters, transition_parameters, transitions):
     x_dot_parameters = numpy.tensordot(x, state_parameters, 1)
-    print x_dot_parameters
 
     n_time_steps, n_states, n_classes = x_dot_parameters.shape
     n_transitions, _ = transitions.shape
@@ -219,8 +218,8 @@ def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
                 #                                       numpy.exp(alphabeta - Z) * x[t - 1, :]), numpy.exp(alphabeta - Z) * x[t - 1, :]
                 #print dstate_parameters
                 if c == cy:
-                    dstate_parameters[:, state, c] += (numpy.exp(alphabeta - class_Z[c]) -
-                                                       numpy.exp(alphabeta - Z) * x[t - 1, :])
+                    dstate_parameters[:, state, c] += ((numpy.exp(alphabeta - class_Z[c]) -
+                                                       numpy.exp(alphabeta - Z)) * x[t - 1, :])
                 else:
                     dstate_parameters[:, state, c] -= numpy.exp(alphabeta - Z) * x[t - 1, :]
 

@@ -105,7 +105,7 @@ class TestHcrf(unittest.TestCase):
                                      [[-3, 6],
                                       [2, 13]]], dtype='f64')
         cy = 1
-        delta = 10.0**-3
+        delta = 5.0**-4
 
         K, S, W = state_parameters.shape
         passed = []
@@ -120,9 +120,20 @@ class TestHcrf(unittest.TestCase):
                     actual_der = dsp0[k, s, w]
                     print k, s, w, '    ', expected_der, actual_der#, dsp0
                     #print ll1, ll0, delta
-                    #self.assertAlmostEqual(expected_der, actual_der, places=2)
-                    passed.append(abs(expected_der - actual_der) < 10.0**-3)
-        self.assertTrue(all(passed))
+                    self.assertAlmostEqual(expected_der, actual_der, places=2)
+                    #passed.append(abs(expected_der - actual_der) < 10.0**-3)
+        #self.assertTrue(all(passed))
+
+        for trans in range(len(transition_parameters)):
+            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd[trans] = delta
+            ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
+            ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)
+            expected_der = (ll1 - ll0) / delta
+            actual_der = dtp0[trans]
+            print trans, '    ', expected_der, actual_der#, dsp0
+            #print ll1, ll0, delta
+            #self.assertAlmostEqual(expected_der, actual_der, places=2)
         kaas
 
 
