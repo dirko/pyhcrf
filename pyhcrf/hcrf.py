@@ -71,12 +71,23 @@ class Hcrf(object):
         if self.transition_parameters is None:
             self.transition_parameters = numpy.random.standard_normal((num_transitions)) * self.transition_parameter_noise
 
+        initial_parameter_vector = self._stack_parameters(self.state_parameters, self.transition_parameters)
+
         def objective_function(parameter_vector):
             ll = 0.0
-            grad = numpy.zeros_like(parameter_vector)
+            gradient = numpy.zeros_like(parameter_vector)
+            state_parameters, transition_parameters = self._unstack_parameters(parameter_vector)
             for x, ty in zip(X, y):
-                dll, dgradient = log_likelihood(x, ty)
-            return -ll, -grad
+                y_index = classes.index(y)
+                dll, dgradient_state, dgradient_transition = log_likelihood(x,
+                                                                            y_index,
+                                                                            state_parameters,
+                                                                            transition_parameters,
+                                                                            self.transitions)
+                dgradient = self._stack_parameters(dgradient_state, dgradient_transition)
+                ll += dll
+                gradient += dgradient
+            return -ll, -gradient
 
         self._optimizer_result = fmin_l_bfgs_b(objective_function, initial_parameter_vector, **optimizer_kwargs)
 
@@ -135,9 +146,19 @@ class Hcrf(object):
                 counter += 1
         return transitions
 
+    @staticmethod
+    def _stack_parameters(state_parameters, transition_parameters):
+        return numpy.concatenate(state_parameters.flatten(), transition_parameters)
+
+    def _unstack_parameters(self, parameter_vector):
+        state_parameter_shape = self.state_parameters.shape
+        num_state_parameters = numpy.prod(state_parameter_shape)
+        return parameter_vector[:num_state_parameters].reshape(state_parameter_shape), parameter_vector[num_state_parameters:]
+
 
 def forward_backward(x, state_parameters, transition_parameters, transitions):
-    x_dot_parameters = numpy.dot(x, state_parameters)
+    x_dot_parameters = numpy.tensordot(x, state_parameters, 1)
+    print x_dot_parameters
 
     n_time_steps, n_states, n_classes = x_dot_parameters.shape
     n_transitions, _ = transitions.shape
@@ -173,3 +194,45 @@ def forward_backward(x, state_parameters, transition_parameters, transitions):
 
     return forward_table, forward_transition_table, backward_table
 
+
+def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
+    forward_table, forward_transition_table, backward_table = forward_backward(x,
+                                                                               state_parameters,
+                                                                               transition_parameters,
+                                                                               transitions)
+    n_time_steps = forward_table.shape[0] - 1
+    n_features, n_states, n_classes = state_parameters.shape
+    n_transitions, _ = transitions.shape
+    dstate_parameters = numpy.zeros_like(state_parameters, dtype='f64')
+    dtransition_parameters = numpy.zeros_like(transition_parameters, dtype='f64')
+
+    class_Z = {c: forward_table[-1, -1, c] for c in range(n_classes)}
+    Z = -numpy.inf
+    for c in range(n_classes):
+        Z = numpy.logaddexp(Z, forward_table[-1, -1, c])
+
+    for t in range(1, n_time_steps + 1):
+        for state in range(n_states):
+            for c in range(n_classes):
+                alphabeta = forward_table[t, state, c] + backward_table[t, state, c]
+                #print t, state, c, alphabeta, (numpy.exp(alphabeta - class_Z[c]) -
+                #                                       numpy.exp(alphabeta - Z) * x[t - 1, :]), numpy.exp(alphabeta - Z) * x[t - 1, :]
+                #print dstate_parameters
+                if c == cy:
+                    dstate_parameters[:, state, c] += (numpy.exp(alphabeta - class_Z[c]) -
+                                                       numpy.exp(alphabeta - Z) * x[t - 1, :])
+                else:
+                    dstate_parameters[:, state, c] -= numpy.exp(alphabeta - Z) * x[t - 1, :]
+
+    for t in range(1, n_time_steps + 1):
+        for transition in range(n_transitions):
+            c = transitions[transition, 0]
+            s0 = transitions[transition, 1]
+            s1 = transitions[transition, 2]
+            alphabeta = forward_transition_table[t, s0, s1, c] + backward_table[t, s1, c]
+            if c == cy:
+                dtransition_parameters[transition] += (numpy.exp(alphabeta - class_Z[c]) - numpy.exp(alphabeta - Z))
+            else:
+                dtransition_parameters[transition] -= numpy.exp(alphabeta - Z)
+
+    return class_Z[cy] - Z, dstate_parameters, dtransition_parameters
