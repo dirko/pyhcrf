@@ -164,8 +164,9 @@ def forward_backward(x, state_parameters, transition_parameters, transitions):
 
     # Add extra 1 time steps, one for start state and one for end
     forward_table = numpy.full((n_time_steps + 1, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
-    forward_transition_table = numpy.full((n_time_steps + 2, n_states, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
+    forward_transition_table = numpy.full((n_time_steps + 1, n_states, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
     forward_table[0, 0, :] = 0.0
+    #forward_transition_table[0, 0, :, :] = 0.0
 
     for t in range(1, n_time_steps + 1):
         for transition in range(n_transitions):
@@ -176,29 +177,36 @@ def forward_backward(x, state_parameters, transition_parameters, transitions):
             forward_table[t, s1, class_number] = numpy.logaddexp(forward_table[t, s1, class_number],
                                                                  edge_potential + x_dot_parameters[t - 1, s1, class_number])
             forward_transition_table[t, s0, s1, class_number] = numpy.logaddexp(forward_transition_table[t, s0, s1, class_number],
-                                                                                edge_potential)
+                                                                                edge_potential +
+                                                                                x_dot_parameters[t - 1, s1, class_number])
 
     backward_table = numpy.full((n_time_steps + 1, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
+    backward_transition_table = numpy.full((n_time_steps + 1, n_states, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
     backward_table[-1, -1, :] = 0.0
+    backward_transition_table[-1, :, -1, :] = 0.0
 
-    for t in range(n_time_steps, 0, -1):
+    for t in range(n_time_steps - 1, -1, -1):
         for transition in range(n_transitions):
             class_number = transitions[transition, 0]
             s0 = transitions[transition, 1]
             s1 = transitions[transition, 2]
-            backward_table[t - 1, s0, class_number] = numpy.logaddexp(backward_table[t - 1, s0, class_number],
-                                                                      backward_table[t, s1, class_number]
-                                                                      + x_dot_parameters[t - 1, s1, class_number]
-                                                                      + transition_parameters[transition])
+            edge_potential = (backward_table[t + 1, s1, class_number] + x_dot_parameters[t, s1, class_number])
+            backward_table[t, s0, class_number] = numpy.logaddexp(backward_table[t, s0, class_number],
+                                                                      edge_potential + transition_parameters[transition])
+            backward_transition_table[t, s0, s1, class_number] = (edge_potential +
+                                                                  transition_parameters[transition])
 
-    return forward_table, forward_transition_table, backward_table
+    return forward_table, forward_transition_table, backward_table, backward_transition_table
 
 
 def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
-    forward_table, forward_transition_table, backward_table = forward_backward(x,
-                                                                               state_parameters,
-                                                                               transition_parameters,
-                                                                               transitions)
+    (forward_table,
+     forward_transition_table,
+     backward_table,
+     backward_transition_table) = forward_backward(x,
+                                                   state_parameters,
+                                                   transition_parameters,
+                                                   transitions)
     n_time_steps = forward_table.shape[0] - 1
     n_features, n_states, n_classes = state_parameters.shape
     n_transitions, _ = transitions.shape
@@ -217,18 +225,29 @@ def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
                 #print t, state, c, alphabeta, (numpy.exp(alphabeta - class_Z[c]) -
                 #                                       numpy.exp(alphabeta - Z) * x[t - 1, :]), numpy.exp(alphabeta - Z) * x[t - 1, :]
                 #print dstate_parameters
+                #print t, c, state, alphabeta, forward_table[t, state, c], backward_table[t, state, c]
                 if c == cy:
                     dstate_parameters[:, state, c] += ((numpy.exp(alphabeta - class_Z[c]) -
                                                        numpy.exp(alphabeta - Z)) * x[t - 1, :])
                 else:
                     dstate_parameters[:, state, c] -= numpy.exp(alphabeta - Z) * x[t - 1, :]
 
+    #print forward_table
+    #print backward_table
+    #print
+    #print '---------------------------------------------'
+    #print forward_transition_table
+    #print backward_transition_table
     for t in range(1, n_time_steps + 1):
         for transition in range(n_transitions):
             c = transitions[transition, 0]
             s0 = transitions[transition, 1]
             s1 = transitions[transition, 2]
+            #alphabeta = forward_transition_table[t, s0, s1, c] + backward_transition_table[t, s0, s1, c]
             alphabeta = forward_transition_table[t, s0, s1, c] + backward_table[t, s1, c]
+            if transition == 0 or transition == 2:
+                #print t, transition, c, s0, s1, alphabeta, forward_transition_table[t, s0, s1, c], backward_transition_table[t, s0, s1, c], Z, class_Z[c]
+                pass
             if c == cy:
                 dtransition_parameters[transition] += (numpy.exp(alphabeta - class_Z[c]) - numpy.exp(alphabeta - Z))
             else:

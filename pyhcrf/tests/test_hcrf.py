@@ -75,10 +75,13 @@ class TestHcrf(unittest.TestCase):
 
         expected_forward_table = np.log(A)
 
-        forward_table, forward_transition_table, backward_table = forward_backward(x,
-                                                                                   state_parameters,
-                                                                                   transition_parameters,
-                                                                                   transitions)
+        (forward_table,
+         forward_transition_table,
+         backward_table,
+         backward_transition_table) = forward_backward(x,
+                                                       state_parameters,
+                                                       transition_parameters,
+                                                       transitions)
         #print np.log(A)
         print (forward_table)
         print backward_table
@@ -86,7 +89,58 @@ class TestHcrf(unittest.TestCase):
         self.assertAlmostEqual(forward_table[-1, -1, 0], backward_table[0, 0, 0], places=5)
         self.assertAlmostEqual(forward_table[-1, -1, 1], backward_table[0, 0, 1], places=5)
 
-    def test_gradient(self):
+    def test_gradient_small_transition(self):
+        transitions = np.array([[0, 0, 0, 0],
+                                [1, 0, 0, 1]])
+        transition_parameters = np.array([1, 0], dtype='f64')
+        x = np.array([[2, 3, -1]], dtype='f64').reshape(1, 3)
+        state_parameters = np.array([[[-1, 2]],
+                                     [[5, -6]],
+                                     [[2, 13]]], dtype='f64')
+        cy = 1
+
+        delta = 5.0**-5
+        for trans in range(len(transition_parameters)):
+            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd[trans] = delta
+            ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
+            ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)
+            expected_der = (ll1 - ll0) / delta
+            actual_der = dtp0[trans]
+            print trans, '    ', expected_der, actual_der#, dsp0
+            #print ll1, ll0, delta
+            self.assertAlmostEqual(expected_der, actual_der, places=2)
+
+    def test_gradient_small(self):
+        transitions = np.array([[0, 0, 1, 0],
+                                [1, 0, 1, 1],
+                                [0, 1, 1, 2],
+                                [1, 1, 1, 3],
+                                [0, 1, 0, 4],
+                                [1, 1, 0, 5]])
+        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='f64')
+        x = np.array([[2, 3, -1]], dtype='f64').reshape(1, 3)
+        state_parameters = np.array([[[-1, 2],
+                                      [3, -4]],
+                                     [[5, -6],
+                                      [7, 8]],
+                                     [[-3, 6],
+                                      [2, 13]]], dtype='f64')
+        cy = 1
+
+        delta = 5.0**-5
+        for trans in range(len(transition_parameters)):
+            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd[trans] = delta
+            ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
+            ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)
+            expected_der = (ll1 - ll0) / delta
+            actual_der = dtp0[trans]
+            print trans, '    ', expected_der, actual_der#, dsp0
+            #print ll1, ll0, delta
+            self.assertAlmostEqual(expected_der, actual_der, places=2)
+
+    def test_gradient_large_state(self):
         transitions = np.array([[0, 0, 1, 0],
                                 [1, 0, 1, 1],
                                 [0, 1, 1, 2],
@@ -108,7 +162,6 @@ class TestHcrf(unittest.TestCase):
         delta = 5.0**-4
 
         K, S, W = state_parameters.shape
-        passed = []
         for k in range(K):
             for s in range(S):
                 for w in range(W):
@@ -119,11 +172,28 @@ class TestHcrf(unittest.TestCase):
                     expected_der = (ll1 - ll0) / delta
                     actual_der = dsp0[k, s, w]
                     print k, s, w, '    ', expected_der, actual_der#, dsp0
-                    #print ll1, ll0, delta
                     self.assertAlmostEqual(expected_der, actual_der, places=2)
-                    #passed.append(abs(expected_der - actual_der) < 10.0**-3)
-        #self.assertTrue(all(passed))
 
+    def test_gradient_large_transition(self):
+        transitions = np.array([[0, 0, 1, 0],
+                                [1, 0, 1, 1],
+                                [0, 1, 1, 2],
+                                [1, 1, 1, 3],
+                                [0, 1, 0, 4],
+                                [1, 1, 0, 5]])
+        transition_parameters = np.array([1, -5, 20, 1, 3, -2], dtype='f64')
+        x = np.array([[-2, 3, -1],
+                      [1, 4, -2],
+                      [4, -4, 2],
+                      [3, 5, 3]], dtype='f64')
+        state_parameters = np.array([[[-1, 2],
+                                      [3, -4]],
+                                     [[5, -6],
+                                      [7, 8]],
+                                     [[-3, 6],
+                                      [2, 13]]], dtype='f64')
+        cy = 1
+        delta = 5.0**-5
         for trans in range(len(transition_parameters)):
             tpd = np.zeros(transition_parameters.shape, dtype='f64')
             tpd[trans] = delta
@@ -133,10 +203,5 @@ class TestHcrf(unittest.TestCase):
             actual_der = dtp0[trans]
             print trans, '    ', expected_der, actual_der#, dsp0
             #print ll1, ll0, delta
-            #self.assertAlmostEqual(expected_der, actual_der, places=2)
-        kaas
-
-
-
-
-
+            #all_ders.append(abs(expected_der - actual_der) < 10.0**-2)
+            self.assertAlmostEqual(expected_der, actual_der, places=2)
