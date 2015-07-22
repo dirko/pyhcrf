@@ -22,7 +22,7 @@ class TestHcrf(unittest.TestCase):
         model.fit(X, y)
         actual = model.predict(X)
 
-        expected = [1, 1, 0, 1]
+        expected = [0, 1, 0, 0]
         self.assertEqual(actual, expected)
 
     def test_train_regression_sparse(self):
