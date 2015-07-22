@@ -1,15 +1,9 @@
 # File: hcrf.py
 # Author: Dirko Coetsee
 # Date: 13 Augustus 2013
-# A script to train and test an HCRF for sparse input vectors.
-#
-# TODO: - Add support for more than one feature on each time step.
-#       - Add feature weights.
-#       - Change inference to use more efficient matrix routines.
+# Updated: 22 July 2015 - almost complete re-write to use sklearn interface.
 
 import numpy
-from random import random, seed
-import sys
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
 
 
@@ -25,7 +19,8 @@ class Hcrf(object):
                  l2_regularization=0.0,
                  transitions=None,
                  state_parameter_noise=0.001,
-                 transition_parameter_noise=0.001):
+                 transition_parameter_noise=0.001,
+                 optimizer_kwargs=None):
         """
         Initialize new HCRF object with hidden units with cardinality `num_states`.
         """
@@ -38,6 +33,7 @@ class Hcrf(object):
         self.transitions = transitions
         self.state_parameter_noise = state_parameter_noise
         self.transition_parameter_noise = transition_parameter_noise
+        self.optimizer_kwargs = optimizer_kwargs if optimizer_kwargs else {}
 
     def fit(self, X, y):
         """Fit the model according to the given training data.
@@ -66,11 +62,14 @@ class Hcrf(object):
         num_transitions, _ = self.transitions.shape
         if self.state_parameters is None:
             self.state_parameters = numpy.random.standard_normal((num_features,
-                                                                  self.num_states + 2,
+                                                                  self.num_states,
                                                                   num_classes)) * self.state_parameter_noise
         if self.transition_parameters is None:
             self.transition_parameters = numpy.random.standard_normal((num_transitions)) * self.transition_parameter_noise
 
+        print self.state_parameters
+        print self.transition_parameters
+        print self.transitions
         initial_parameter_vector = self._stack_parameters(self.state_parameters, self.transition_parameters)
 
         def objective_function(parameter_vector):
@@ -78,7 +77,7 @@ class Hcrf(object):
             gradient = numpy.zeros_like(parameter_vector)
             state_parameters, transition_parameters = self._unstack_parameters(parameter_vector)
             for x, ty in zip(X, y):
-                y_index = classes.index(y)
+                y_index = classes.index(ty)
                 dll, dgradient_state, dgradient_transition = log_likelihood(x,
                                                                             y_index,
                                                                             state_parameters,
@@ -89,7 +88,7 @@ class Hcrf(object):
                 gradient += dgradient
             return -ll, -gradient
 
-        self._optimizer_result = fmin_l_bfgs_b(objective_function, initial_parameter_vector, **optimizer_kwargs)
+        self._optimizer_result = fmin_l_bfgs_b(objective_function, initial_parameter_vector, **self.optimizer_kwargs)
 
     def predict(self, X):
         """Predict the class for X.
@@ -105,7 +104,7 @@ class Hcrf(object):
         y : iterable of shape = [n_samples]
             The predicted classes.
         """
-        return [self.classes[prediction.argmax()] for prediction in self.predict_proba(X)]
+        return [self.classes_[prediction.argmax()] for prediction in self.predict_proba(X)]
 
     def predict_proba(self, X):
         """Probability estimates.
@@ -125,30 +124,38 @@ class Hcrf(object):
         """
         y = []
         for x in X:
-            forward_table, _, _ = forward_backward(x,
-                                                   self.state_parameters,
-                                                   self.transition_parameters,
-                                                   self.transitions)
+            forward_table, _, _, _ = forward_backward(x, self.state_parameters, self.transition_parameters, self.transitions)
             y.append(numpy.exp(forward_table[-1, -1, :]))
         return numpy.array(y)
 
     @staticmethod
     def _create_default_transitions(num_classes, num_states):
-        num_transitions = num_classes * ((num_states * 2) + 2)
-        transitions = numpy.zeros((num_transitions, 4))
+        # 0  o>
+        # 1  o>
+        # 2  o>
+        num_transitions = num_classes * ((num_states * 2) - 1)
+        transitions = numpy.zeros((num_transitions, 3))
         counter = 0
-        for transition in range(num_states + 1):
+        for c in range(num_classes):  # The zeroth state
+            transitions[counter, 0] = c
+            transitions[counter, 1] = 0
+            transitions[counter, 2] = 0
+            counter += 1
+        for state in range(0, num_states - 1):  # Subsequent states
             for c in range(num_classes):
-                transitions[counter, 0] = c
-                transitions[counter, 1] = transition
-                transitions[counter, 2] = transition + 1
-                transitions[counter, 3] = transition
+                transitions[counter, 0] = c  # To the next state
+                transitions[counter, 1] = state
+                transitions[counter, 2] = state + 1
+                counter += 1
+                transitions[counter, 0] = c  # Stays in same state
+                transitions[counter, 1] = state + 1
+                transitions[counter, 2] = state + 1
                 counter += 1
         return transitions
 
     @staticmethod
     def _stack_parameters(state_parameters, transition_parameters):
-        return numpy.concatenate(state_parameters.flatten(), transition_parameters)
+        return numpy.concatenate((state_parameters.flatten(), transition_parameters))
 
     def _unstack_parameters(self, parameter_vector):
         state_parameter_shape = self.state_parameters.shape
@@ -157,16 +164,16 @@ class Hcrf(object):
 
 
 def forward_backward(x, state_parameters, transition_parameters, transitions):
-    x_dot_parameters = numpy.tensordot(x, state_parameters, 1)
+    n_time_steps, n_features = x.shape
+    _, n_states, n_classes = state_parameters.shape
+    x_dot_parameters = x.dot(state_parameters.reshape(n_features, -1)).reshape((n_time_steps, n_states, n_classes))
 
-    n_time_steps, n_states, n_classes = x_dot_parameters.shape
     n_transitions, _ = transitions.shape
 
     # Add extra 1 time steps, one for start state and one for end
     forward_table = numpy.full((n_time_steps + 1, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
     forward_transition_table = numpy.full((n_time_steps + 1, n_states, n_states, n_classes), fill_value=-numpy.inf, dtype='f64')
     forward_table[0, 0, :] = 0.0
-    #forward_transition_table[0, 0, :, :] = 0.0
 
     for t in range(1, n_time_steps + 1):
         for transition in range(n_transitions):
@@ -222,32 +229,18 @@ def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
         for state in range(n_states):
             for c in range(n_classes):
                 alphabeta = forward_table[t, state, c] + backward_table[t, state, c]
-                #print t, state, c, alphabeta, (numpy.exp(alphabeta - class_Z[c]) -
-                #                                       numpy.exp(alphabeta - Z) * x[t - 1, :]), numpy.exp(alphabeta - Z) * x[t - 1, :]
-                #print dstate_parameters
-                #print t, c, state, alphabeta, forward_table[t, state, c], backward_table[t, state, c]
                 if c == cy:
                     dstate_parameters[:, state, c] += ((numpy.exp(alphabeta - class_Z[c]) -
                                                        numpy.exp(alphabeta - Z)) * x[t - 1, :])
                 else:
                     dstate_parameters[:, state, c] -= numpy.exp(alphabeta - Z) * x[t - 1, :]
 
-    #print forward_table
-    #print backward_table
-    #print
-    #print '---------------------------------------------'
-    #print forward_transition_table
-    #print backward_transition_table
     for t in range(1, n_time_steps + 1):
         for transition in range(n_transitions):
             c = transitions[transition, 0]
             s0 = transitions[transition, 1]
             s1 = transitions[transition, 2]
-            #alphabeta = forward_transition_table[t, s0, s1, c] + backward_transition_table[t, s0, s1, c]
             alphabeta = forward_transition_table[t, s0, s1, c] + backward_table[t, s1, c]
-            if transition == 0 or transition == 2:
-                #print t, transition, c, s0, s1, alphabeta, forward_transition_table[t, s0, s1, c], backward_transition_table[t, s0, s1, c], Z, class_Z[c]
-                pass
             if c == cy:
                 dtransition_parameters[transition] += (numpy.exp(alphabeta - class_Z[c]) - numpy.exp(alphabeta - Z))
             else:

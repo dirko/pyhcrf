@@ -2,7 +2,7 @@ import unittest
 
 from numpy.testing import assert_array_almost_equal, assert_array_equal
 import numpy as np
-from numpy import random
+from scipy.sparse import csr_matrix
 from pyhcrf import Hcrf
 from pyhcrf.hcrf import forward_backward
 from pyhcrf.hcrf import log_likelihood
@@ -11,26 +11,32 @@ TEST_PRECISION = 3
 
 
 class TestHcrf(unittest.TestCase):
-    def test_train_regression_a(self):
+    def test_train_regression(self):
         # Lets add a test just to get everything working so we can refactor.
-        X = [[[1], [5], [7]], [[6], [3]], [[1]], [[1], [5], [4]]]
+        X = [np.array([[1, 2], [5, 9], [7, 3]]),
+             np.array([[6, -2], [3, 3]]),
+             np.array([[1, -1]]),
+             np.array([[1, 1], [5, 3], [4, 2], [3, 3]])]
         y = [0, 1, 0, 1]
         model = Hcrf(3)
         model.fit(X, y)
         actual = model.predict(X)
 
-        expected = [0, 1, 0, 0]
+        expected = [1, 1, 0, 1]
         self.assertEqual(actual, expected)
 
-    def test_train_regression_b(self):
+    def test_train_regression_sparse(self):
         # Lets add a test just to get everything working so we can refactor.
-        X = [[[1], [5], [7]], [[6], [3]], [[1]], [[1], [5], [4]]]
+        X = [csr_matrix((np.ones(3), np.array([1, 4, 7]), np.array(range(4))), shape=(3, 10)),
+             csr_matrix((np.ones(3), np.array([3, 8, 7]), np.array(range(4))), shape=(3, 10)),
+             csr_matrix((np.ones(1), np.array([3]), np.array(range(2))), shape=(1, 10)),
+             csr_matrix((np.ones(4), np.array([1, 4, 7, 9]), np.array(range(5))), shape=(4, 10))]
         y = [0, 1, 0, 1]
         model = Hcrf(5, 1.0)
         model.fit(X, y)
         actual = model.predict(X)
 
-        expected = [0, 1, 0, 1]
+        expected = [0, 0, 0, 1]
         self.assertEqual(actual, expected)
 
     def test_forward_backward(self):
