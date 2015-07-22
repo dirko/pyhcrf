@@ -16,11 +16,12 @@ class Hcrf(object):
     """
     def __init__(self,
                  num_states=2,
-                 l2_regularization=0.0,
+                 l2_regularization=1.0,
                  transitions=None,
                  state_parameter_noise=0.001,
                  transition_parameter_noise=0.001,
-                 optimizer_kwargs=None):
+                 optimizer_kwargs=None,
+                 random_seed=0):
         """
         Initialize new HCRF object with hidden units with cardinality `num_states`.
         """
@@ -34,6 +35,7 @@ class Hcrf(object):
         self.state_parameter_noise = state_parameter_noise
         self.transition_parameter_noise = transition_parameter_noise
         self.optimizer_kwargs = optimizer_kwargs if optimizer_kwargs else {}
+        self._random_seed = random_seed
 
     def fit(self, X, y):
         """Fit the model according to the given training data.
@@ -60,6 +62,7 @@ class Hcrf(object):
         # Initialise the parameters
         _, num_features = X[0].shape
         num_transitions, _ = self.transitions.shape
+        numpy.random.seed(self._random_seed)
         if self.state_parameters is None:
             self.state_parameters = numpy.random.standard_normal((num_features,
                                                                   self.num_states,
@@ -67,9 +70,6 @@ class Hcrf(object):
         if self.transition_parameters is None:
             self.transition_parameters = numpy.random.standard_normal((num_transitions)) * self.transition_parameter_noise
 
-        print self.state_parameters
-        print self.transition_parameters
-        print self.transitions
         initial_parameter_vector = self._stack_parameters(self.state_parameters, self.transition_parameters)
 
         def objective_function(parameter_vector):
@@ -89,6 +89,8 @@ class Hcrf(object):
             return -ll, -gradient
 
         self._optimizer_result = fmin_l_bfgs_b(objective_function, initial_parameter_vector, **self.optimizer_kwargs)
+        self.state_parameters, self.transition_parameters = self._unstack_parameters(self._optimizer_result[0])
+        print self._optimizer_result
 
     def predict(self, X):
         """Predict the class for X.
