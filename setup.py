@@ -2,6 +2,7 @@ from setuptools import setup
 from codecs import open
 from os import path
 from Cython.Build import cythonize
+import numpy
 
 here = path.abspath(path.dirname(__file__))
 
@@ -16,6 +17,7 @@ setup(
     packages=['pyhcrf'],
     install_requires=['numpy>=1.9'],
     ext_modules=cythonize('pyhcrf/algorithms.pyx'),
+    include_dirs=[numpy.get_include()],
     url='https://github.com/dirko/pyhcrf',
     license='GPL',
     author='Dirko Coetsee',

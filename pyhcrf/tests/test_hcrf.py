@@ -13,12 +13,14 @@ TEST_PRECISION = 3
 class TestHcrf(unittest.TestCase):
     def test_train_regression(self):
         # Lets add a test just to get everything working so we can refactor.
-        X = [np.array([[1, 2], [5, 9], [7, 3]]),
-             np.array([[6, -2], [3, 3]]),
-             np.array([[1, -1]]),
-             np.array([[1, 1], [5, 3], [4, 2], [3, 3]])]
+        X = [np.array([[1, 2], [5, 9], [7, 3.0]], dtype='float64'),
+             np.array([[6, -2], [3, 3.0]], dtype='float64'),
+             np.array([[1, -1.0]], dtype='float64'),
+             np.array([[1, 1], [5, 3], [4, 2], [3.0, 3]], dtype='float64')]
         y = [0, 1, 0, 1]
         model = Hcrf(3)
+        print X[0].dtype
+        print
         model.fit(X, y)
         actual = model.predict(X)
 
@@ -46,17 +48,17 @@ class TestHcrf(unittest.TestCase):
                                 [1, 1, 1, 3],
                                 [0, 1, 0, 4],
                                 [1, 1, 0, 5]])
-        transition_parameters = np.array([1, 0, 2, 1, 3, -2])
+        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='float64')
         x = np.array([[2, 3],
                       [1, 0],
-                      [0, 2]])
+                      [0, 2]], dtype='float64')
         state_parameters = np.array([[[-1, 1],
                                       [1, -1]],
                                      [[0, -2],
-                                      [2, 3]]])
+                                      [2, 3]]], dtype='float64')
         print 'X.L'
         print np.dot(x, state_parameters)
-        A = np.zeros((4, 2, 2), dtype='f64')
+        A = np.zeros((4, 2, 2), dtype='float64')
         # T  S  W
         # 5, 2, 2
         A[0, 0, 0] = 1
@@ -81,9 +83,15 @@ class TestHcrf(unittest.TestCase):
 
         expected_forward_table = np.log(A)
 
+        n_features = 2
+        n_time_steps = 3
+        n_states = 2
+        n_classes = 2
+        x_dot_parameters = x.dot(state_parameters.reshape(n_features, -1)).reshape((n_time_steps, n_states, n_classes))
+
         (forward_table,
          forward_transition_table,
-         backward_table) = forward_backward(x,
+         backward_table) = forward_backward(x_dot_parameters,
                                             state_parameters,
                                             transition_parameters,
                                             transitions)
@@ -97,16 +105,16 @@ class TestHcrf(unittest.TestCase):
     def test_gradient_small_transition(self):
         transitions = np.array([[0, 0, 0, 0],
                                 [1, 0, 0, 1]])
-        transition_parameters = np.array([1, 0], dtype='f64')
-        x = np.array([[2, 3, -1]], dtype='f64').reshape(1, 3)
+        transition_parameters = np.array([1, 0], dtype='float64')
+        x = np.array([[2, 3, -1]], dtype='float64').reshape(1, 3)
         state_parameters = np.array([[[-1, 2]],
                                      [[5, -6]],
-                                     [[2, 13]]], dtype='f64')
+                                     [[2, 13]]], dtype='float64')
         cy = 1
 
         delta = 5.0**-5
         for trans in range(len(transition_parameters)):
-            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd = np.zeros(transition_parameters.shape, dtype='float64')
             tpd[trans] = delta
             ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
             ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)
@@ -123,19 +131,19 @@ class TestHcrf(unittest.TestCase):
                                 [1, 1, 1, 3],
                                 [0, 1, 0, 4],
                                 [1, 1, 0, 5]])
-        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='f64')
-        x = np.array([[2, 3, -1]], dtype='f64').reshape(1, 3)
+        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='float64')
+        x = np.array([[2, 3, -1]], dtype='float64').reshape(1, 3)
         state_parameters = np.array([[[-1, 2],
                                       [3, -4]],
                                      [[5, -6],
                                       [7, 8]],
                                      [[-3, 6],
-                                      [2, 13]]], dtype='f64')
+                                      [2, 13]]], dtype='float64')
         cy = 1
 
         delta = 5.0**-5
         for trans in range(len(transition_parameters)):
-            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd = np.zeros(transition_parameters.shape, dtype='float64')
             tpd[trans] = delta
             ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
             ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)
@@ -152,17 +160,17 @@ class TestHcrf(unittest.TestCase):
                                 [1, 1, 1, 3],
                                 [0, 1, 0, 4],
                                 [1, 1, 0, 5]])
-        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='f64')
+        transition_parameters = np.array([1, 0, 2, 1, 3, -2], dtype='float64')
         x = np.array([[2, 3, -1],
                       [1, 4, -2],
                       [5, 2, -3],
-                      [-2, 5, 3]], dtype='f64')
+                      [-2, 5, 3]], dtype='float64')
         state_parameters = np.array([[[-1, 2],
                                       [3, -4]],
                                      [[5, -6],
                                       [7, 8]],
                                      [[-3, 6],
-                                      [2, 13]]], dtype='f64')
+                                      [2, 13]]], dtype='float64')
         cy = 1
         delta = 5.0**-4
 
@@ -170,7 +178,7 @@ class TestHcrf(unittest.TestCase):
         for k in range(K):
             for s in range(S):
                 for w in range(W):
-                    spd = np.zeros(state_parameters.shape, dtype='f64')
+                    spd = np.zeros(state_parameters.shape, dtype='float64')
                     spd[k, s, w] = delta
                     ll0, dsp0, _ = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
                     ll1, dsp1, _ = log_likelihood(x, cy, state_parameters + spd, transition_parameters, transitions)
@@ -186,21 +194,21 @@ class TestHcrf(unittest.TestCase):
                                 [1, 1, 1, 3],
                                 [0, 1, 0, 4],
                                 [1, 1, 0, 5]])
-        transition_parameters = np.array([1, -5, 20, 1, 3, -2], dtype='f64')
+        transition_parameters = np.array([1, -5, 20, 1, 3, -2], dtype='float64')
         x = np.array([[-2, 3, -1],
                       [1, 4, -2],
                       [4, -4, 2],
-                      [3, 5, 3]], dtype='f64')
+                      [3, 5, 3]], dtype='float64')
         state_parameters = np.array([[[-1, 2],
                                       [3, -4]],
                                      [[5, -6],
                                       [7, 8]],
                                      [[-3, 6],
-                                      [2, 13]]], dtype='f64')
+                                      [2, 13]]], dtype='float64')
         cy = 1
         delta = 5.0**-5
         for trans in range(len(transition_parameters)):
-            tpd = np.zeros(transition_parameters.shape, dtype='f64')
+            tpd = np.zeros(transition_parameters.shape, dtype='float64')
             tpd[trans] = delta
             ll0, _, dtp0 = log_likelihood(x, cy, state_parameters, transition_parameters, transitions)
             ll1, _, dtp1 = log_likelihood(x, cy, state_parameters, transition_parameters + tpd, transitions)

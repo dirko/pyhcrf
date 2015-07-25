@@ -133,7 +133,10 @@ class Hcrf(object):
         """
         y = []
         for x in X:
-            forward_table, _, _ = forward_backward(x, self.state_parameters, self.transition_parameters, self.transitions)
+            n_time_steps, n_features = x.shape
+            _, n_states, n_classes = self.state_parameters.shape
+            x_dot_parameters = x.dot(self.state_parameters.reshape(n_features, -1)).reshape((n_time_steps, n_states, n_classes))
+            forward_table, _, _ = forward_backward(x_dot_parameters, self.state_parameters, self.transition_parameters, self.transitions)
             y.append(numpy.exp(forward_table[-1, -1, :]))
         return numpy.array(y)
 
@@ -143,7 +146,7 @@ class Hcrf(object):
         # 1  o>
         # 2  o>
         num_transitions = num_classes * ((num_states * 2) - 1)
-        transitions = numpy.zeros((num_transitions, 3))
+        transitions = numpy.zeros((num_transitions, 3), dtype='int64')
         counter = 0
         for c in range(num_classes):  # The zeroth state
             transitions[counter, 0] = c
@@ -170,5 +173,3 @@ class Hcrf(object):
         state_parameter_shape = self.state_parameters.shape
         num_state_parameters = numpy.prod(state_parameter_shape)
         return parameter_vector[:num_state_parameters].reshape(state_parameter_shape), parameter_vector[num_state_parameters:]
-
-
