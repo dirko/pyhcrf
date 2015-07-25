@@ -83,11 +83,10 @@ class TestHcrf(unittest.TestCase):
 
         (forward_table,
          forward_transition_table,
-         backward_table,
-         backward_transition_table) = forward_backward(x,
-                                                       state_parameters,
-                                                       transition_parameters,
-                                                       transitions)
+         backward_table) = forward_backward(x,
+                                            state_parameters,
+                                            transition_parameters,
+                                            transitions)
         #print np.log(A)
         print (forward_table)
         print backward_table

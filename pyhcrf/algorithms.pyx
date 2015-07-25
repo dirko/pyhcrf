@@ -35,9 +35,7 @@ def forward_backward(x, state_parameters, transition_parameters, transitions):
                                                                                 x_dot_parameters[t - 1, s1, class_number])
 
     backward_table = numpy.full((n_time_steps + 1, n_states, n_classes), fill_value=-inf, dtype='f64')
-    backward_transition_table = numpy.full((n_time_steps + 1, n_states, n_states, n_classes), fill_value=-inf, dtype='f64')
     backward_table[-1, -1, :] = 0.0
-    backward_transition_table[-1, :, -1, :] = 0.0
 
     for t in range(n_time_steps - 1, -1, -1):
         for transition in range(n_transitions):
@@ -47,20 +45,17 @@ def forward_backward(x, state_parameters, transition_parameters, transitions):
             edge_potential = (backward_table[t + 1, s1, class_number] + x_dot_parameters[t, s1, class_number])
             backward_table[t, s0, class_number] = logaddexp(backward_table[t, s0, class_number],
                                                                   edge_potential + transition_parameters[transition])
-            backward_transition_table[t, s0, s1, class_number] = (edge_potential +
-                                                                  transition_parameters[transition])
 
-    return forward_table, forward_transition_table, backward_table, backward_transition_table
+    return forward_table, forward_transition_table, backward_table
 
 
 def log_likelihood(x, cy, state_parameters, transition_parameters, transitions):
     (forward_table,
      forward_transition_table,
-     backward_table,
-     backward_transition_table) = forward_backward(x,
-                                                   state_parameters,
-                                                   transition_parameters,
-                                                   transitions)
+     backward_table) = forward_backward(x,
+                                        state_parameters,
+                                        transition_parameters,
+                                        transitions)
     n_time_steps = forward_table.shape[0] - 1
     n_features, n_states, n_classes = state_parameters.shape
     n_transitions, _ = transitions.shape

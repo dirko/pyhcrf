@@ -133,7 +133,7 @@ class Hcrf(object):
         """
         y = []
         for x in X:
-            forward_table, _, _, _ = forward_backward(x, self.state_parameters, self.transition_parameters, self.transitions)
+            forward_table, _, _ = forward_backward(x, self.state_parameters, self.transition_parameters, self.transitions)
             y.append(numpy.exp(forward_table[-1, -1, :]))
         return numpy.array(y)
 
