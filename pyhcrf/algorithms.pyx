@@ -84,11 +84,15 @@ def log_likelihood(x,
     cdef ndarray[double, ndim=3] dstate_parameters = np.zeros_like(state_parameters, dtype='float64')
     cdef ndarray[double, ndim=1] dtransition_parameters = np.zeros_like(transition_parameters, dtype='float64')
 
-    cdef dict class_Z = {c: forward_table[-1, -1, c] for c in range(n_classes)}
-    Z = -inf
+    cdef ndarray[double, ndim=1] class_Z = np.empty((n_classes,))
+    cdef double Z = -inf
+    cdef unsigned int c
     for c in range(n_classes):
+        class_Z[c] = forward_table[-1, -1, c]
         Z = logaddexp(Z, forward_table[-1, -1, c])
 
+    cdef unsigned int t, state, transition, s0, s1
+    cdef double alphabeta
     for t in range(1, n_time_steps + 1):
         for state in range(n_states):
             for c in range(n_classes):
