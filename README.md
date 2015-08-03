@@ -58,7 +58,8 @@ confusion_matrix(y, pred)
 Each state is numbered `0, 1, ..., num_states - 1`. The state machine starts in `state 0` and ends in `num_states - 1`.
 Currently the state transitions are constrained so that, on each element in the input sequence,
  the state machine either stays in the current state or
-advances to a state with a higher number. This default can be changed by setting the `transitions` and corresponding
+advances to a state represented by the next number.
+ This default can be changed by setting the `transitions` and corresponding
 `transition_parameters` properties.
 
 ## Dependencies

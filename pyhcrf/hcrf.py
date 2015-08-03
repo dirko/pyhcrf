@@ -168,27 +168,23 @@ class Hcrf(object):
 
     @staticmethod
     def _create_default_transitions(num_classes, num_states):
-        # 0  o>
-        # 1  o>
-        # 2  o>
-        num_transitions = num_classes * ((num_states * 2) - 1)
-        transitions = numpy.zeros((num_transitions, 3), dtype='int64')
-        counter = 0
+        # 0    o>
+        # 1    o>\\\
+        # 2   /o>/||
+        # 3  |/o>//
+        # 4  \\o>/
+        transitions = []
         for c in range(num_classes):  # The zeroth state
-            transitions[counter, 0] = c
-            transitions[counter, 1] = 0
-            transitions[counter, 2] = 0
-            counter += 1
+            transitions.append([c, 0, 0])
         for state in range(0, num_states - 1):  # Subsequent states
             for c in range(num_classes):
-                transitions[counter, 0] = c  # To the next state
-                transitions[counter, 1] = state
-                transitions[counter, 2] = state + 1
-                counter += 1
-                transitions[counter, 0] = c  # Stays in same state
-                transitions[counter, 1] = state + 1
-                transitions[counter, 2] = state + 1
-                counter += 1
+                transitions.append([c, state, state + 1])  # To the next state
+                transitions.append([c, state + 1, state + 1])  # Stays in same state
+                if state > 0:
+                    transitions.append([c, 0, state + 1])  # From the start state
+                if state < num_states - 1:
+                    transitions.append([c, state + 1, num_states - 1])  # To the end state
+        transitions = numpy.array(transitions, dtype='int64')
         return transitions
 
     @staticmethod
