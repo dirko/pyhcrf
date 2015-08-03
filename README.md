@@ -5,7 +5,7 @@ A hidden (state) conditional random field (HCRF) implementation written in Pytho
 
 This package aims to implement the HCRF model with a `sklearn` type interface. The model classifies sequences
 according to a latent state sequence. This package provides methods to learn parameters from example sequences and
-to score new sequences. See the [paper]() by TODO and the
+to score new sequences. See the [paper](people.csail.mit.edu/sybor/cvpr06_wang.pdf) by Wang et al and the
 report *Conditional Random Fields for Noisy text normalisation* by Dirko Coetsee.
 
 ## Example
