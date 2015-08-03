@@ -5,7 +5,7 @@ A hidden (state) conditional random field (HCRF) implementation written in Pytho
 
 This package aims to implement the HCRF model with a `sklearn` type interface. The model classifies sequences
 according to a latent state sequence. This package provides methods to learn parameters from example sequences and
-to score new sequences. See the [paper](people.csail.mit.edu/sybor/cvpr06_wang.pdf) by Wang et al and the
+to score new sequences. See the [paper](www.people.csail.mit.edu/sybor/cvpr06_wang.pdf) by Wang et al and the
 report *Conditional Random Fields for Noisy text normalisation* by Dirko Coetsee.
 
 ## Example
@@ -39,14 +39,17 @@ y = [0, 1, 0, 1, 1, 0, 1, 0, 0, 0]
 ![Training examples](training_examples.png "Training examples")
 
 ```python
+from pyhcrf import Hcrf
+from sklearn.metrics import confusion_matrix
+
 model = Hcrf(num_states=3,
              l2_regularization=1.0,
              verbosity=10,
              random_seed=3,
              optimizer_kwargs={'maxfun':200})
 model.fit(X, y)
-pred = model.predict(samples)
-confusion_matrix(classes, pred)
+pred = model.predict(X)
+confusion_matrix(y, pred)
 > array([[12,  0],
 >        [ 0,  8]])
 ```
