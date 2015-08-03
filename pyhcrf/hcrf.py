@@ -1,7 +1,10 @@
 # File: hcrf.py
 # Author: Dirko Coetsee
+# License: GPL
+# (Contact me if this is a problem.)
 # Date: 13 Augustus 2013
-# Updated: 22 July 2015 - almost complete re-write to use sklearn interface.
+# Updated: 22 July 2015 - almost complete re-write to use sklearn-type interface.
+#           3 Aug 2015 - Done with new interface.
 
 import numpy
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b

@@ -1,85 +1,69 @@
-pyHCRF
+`pyHCRF`
 ==================
 
-An hidden conditional random field (HCRF) implementation for text applications 
-written in Python.
+A hidden (state) conditional random field (HCRF) implementation written in Python and Cython.
 
-This software was written during the course of my masters project to show how 
-a hidden CRF can be used to classify the sentiment of tweets. For the simple
-models we tried, the HCRF unfortunately did not improve the classification
-significantly beyond that of using logistic regression. More details can be 
-found in the report: *Conditional random fields for noisy text normalisation*.
+This package aims to implement the HCRF model with a `sklearn` type interface. The model classifies sequences
+according to a latent state sequence. This package provides methods to learn parameters from example sequences and
+to score new sequences. See the [paper]() by TODO and the
+report *Conditional Random Fields for Noisy text normalisation* by Dirko Coetsee.
 
-Usage
----------
+## Example
 
-hcrf.py can be run as a script to train and test models, and to score input
-vectors.
-> usage: hcrf.py mode datafile paramfile H [lamb]  
->  
-> +   mode:      Set the script mode to train, tst, or label.  
->
-> +   datafile:  File containing input datapoints.  
->  +             Format: lines consisting of  
->                label 1 [feat1 feat2 ... ] 2  
->                where label is a non-negative integer, 1 is the special start  
->                of datapoint feature, 2 is the special end of datapoint feature,  
->                and feat1, feat2 etc. are integers > 2 representing features  
->                activated at the first, second etc. time steps.  
->
-> +  paramfile: File to store/retrieve parameters.  
->
-> + H:         Cardinality of hidden units. Must be >= 3.  
->
-> +  lamb:      l2 reguralization constant. Only applicable when mode is train.  
+```python
+X = [array([[ 1. , -0.82683403,  2.48881337],
+            [ 1. , -1.07491808,  1.55848197],
+            [ 1. ,  6.7814359 ,  4.01074595]]),
+     array([[ 1. , -3.01165932, -2.15972362],
+            [ 1. , -3.41449473, -2.2668825 ]]),
+     array([[ 1. , -2.64921323, -1.20159641],
+            [ 1. ,  0.31139394,  1.58841159]]),
+     array([[ 1. ,  5.85226017,  2.43317499],
+            [ 1. , -1.57598266, -2.07585778]]),
+     array([[ 1. , -0.32999744, -2.70695361],
+            [ 1. ,  0.44311988,  0.36400733]]),
+     array([[ 1. , -0.05301562,  3.95424435],
+            [ 1. ,  3.04540498, -3.25040276]]),
+     array([[ 1. , -4.29117715,  0.9167861 ],
+            [ 1. , -3.22775884,  1.83277224]]),
+     array([[ 1. , -2.80856491,  1.95630489],
+            [ 1. ,  1.62290542, -0.7457237 ]]),
+     array([[ 1. , -2.32682366,  2.60844469],
+            [ 1. ,  2.12320609,  1.04483217]]),
+     array([[ 1. , -4.17616178,  4.09969658],
+            [ 1. ,  0.67287935, -5.67652159]])]
 
-Example
--------
-If we have two examples of messages with positive sentiment:
-> 1: This is awesome!  
-> 2: cool!
-
-and two examples of negative messages:
-> 3: This sucks.  
-> 4: would not recommend.
-
-then we have a lexicon composed of the following tokens, along with a numbering:
-
-|  START  |  END  |  !|  .| awesome| cool| is| not| recommend| sucks| this| would | 
-|---------|-------|---|---|--------|-----|---|----|----------|------|-----|-------|
-|        1|      2|  3|  4|       5|    6|  7|   8|         9|    10|  11 |     12|
-
-We can now encode the first message as a sequence of features that are activated
-one after the other:
-> 1: 1 11 7 5 2
-
-When we choose the label 0 for positive messages and 1 for negative messages, our
-training data, train.dat, looks like:
-> 0 1 11 7 5 2  
-> 0 1 6 3 2  
-> 1 1 11 10 2  
-> 1 1 12 8 9 2
-
-A model can be trained then with
-```bash
-python hcrf.py train train.dat params.dat 5 0.1
+y = [0, 1, 0, 1, 1, 0, 1, 0, 0, 0]
 ```
 
-When a model is tested or labeled, the labels in the input file are still necessary 
-but are ignored
-```bash
-python hcrf.py tst train.dat params.dat 5    # gives accuracy on training data
-python hcrf.py label train.dat params.dat 5  # prints out sequence of predicted labels
+![Training examples](training_examples.png "Training examples")
+
+```python
+model = Hcrf(num_states=3,
+             l2_regularization=1.0,
+             verbosity=10,
+             random_seed=3,
+             optimizer_kwargs={'maxfun':200})
+model.fit(X, y)
+pred = model.predict(samples)
+confusion_matrix(classes, pred)
+> array([[12,  0],
+>        [ 0,  8]])
 ```
 
-In the example above, the cardinality of the hidden variable is set to `S=5`.
-The HCRF state machine starts in state 0 for the **START** feature and ends
-in state `S-1` with the **END** feature. In between, the machine is currently
-constrained to only allow transitions to higher states:
-```
-( 0 )---->( 1 )---->( 2 )---->( 3 )---->( 4 )
-           | ^       | ^       | ^      
-            U         U         U
-```
+## States
+Each state is numbered `0, 1, ..., num_states - 1`. The state machine starts in `state 0` and ends in `num_states - 1`.
+Currently the state transitions are constrained so that, on each element in the input sequence,
+ the state machine either stays in the current state or
+advances to a state with a higher number. This default can be changed by setting the `transitions` and corresponding
+`transition_parameters` properties.
 
+## Dependencies
+`numpy`, `scipy` (for the LM-BFGS optimiser and `scipy.sparse`), and `cython`.
 
+## Installation
+Download/clone and run
+
+```
+python setup.py install
+```
