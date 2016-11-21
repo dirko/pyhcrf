@@ -69,5 +69,6 @@ advances to a state represented by the next number.
 Download/clone and run
 
 ```
+python setup.py build_ext --inplace
 python setup.py install
 ```

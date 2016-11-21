@@ -8,7 +8,7 @@
 
 import numpy
 from scipy.optimize.lbfgsb import fmin_l_bfgs_b
-from algorithms import forward_backward, log_likelihood
+from pyhcrf.algorithms import forward_backward, log_likelihood
 
 
 class Hcrf(object):
