@@ -1,6 +1,6 @@
 # File: hcrf.py
 # Author: Dirko Coetsee
-# License: GPL
+# License: BSD-2-Clause
 # (Contact me if this is a problem.)
 # Date: 13 Augustus 2013
 # Updated: 22 July 2015 - almost complete re-write to use sklearn-type interface.
